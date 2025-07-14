@@ -1,4 +1,4 @@
 fastapi
-uvicorn
 sendgrid
-python-dotenv
+pydantic
+uvicorn

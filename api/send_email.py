@@ -42,7 +42,7 @@ async def send_auth_token(req: RequestSchema):
     )
 
     try:
-        api_key = os.getenv("SENDGRID_API_KEY")
+        api_key = os.getenv("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")
         if not api_key:
             raise Exception("Missing SENDGRID_API_KEY")
 

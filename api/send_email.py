@@ -30,29 +30,29 @@ def send_auth_token_info():
 
 @app.post("/api/send-auth-token")
 async def send_auth_token(req: RequestSchema):
-    token = "".join(random.choices(string.digits, k=6))
-    expires_at = time.time() + TOKEN_TTL
-    token_store[req.email] = (token, expires_at)
-
-    message = Mail(
-        from_email=os.getenv("SENDGRID_FROM", "no-reply@admissionsystem.com"),
-        to_emails=req.email,
-        subject="Your Verification Code",
-        html_content=f"<p>Your code is <strong>{token}</strong>. It expires in 5 minutes.</p>",
-    )
-
     try:
-        api_key = os.getenv("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")
-        if not api_key:
-            raise Exception("Missing SENDGRID_API_KEY")
+        print("Generating token...")
+        token = generate_token()
+        expires_at = time.time() + TOKEN_TTL
+        token_store[req.email] = (token, expires_at)
 
-        sg = SendGridAPIClient(api_key)
+        message = Mail(
+            from_email=os.getenv("SENDGRID_FROM", "no-reply@admissionsystem.com"),
+            to_emails=req.email,
+            subject="Your Verification Code",
+            html_content=f"<p>Your code is <strong>{token}</strong>. It expires in 5 minutes.</p>",
+        )
+
+        print("Sending email to:", req.email)
+        sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
         sg.send(message)
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"SendGrid error: {str(e)}")
+        print("Email sent!")
+        return {"status": "sent"}
 
-    return {"status": "sent"}
+    except Exception as e:
+        print("Error sending email:", e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/verify-auth-token")
 async def verify_auth_token(req: VerifySchema):

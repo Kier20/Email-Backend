@@ -53,20 +53,3 @@ async def send_auth_token(req: RequestSchema):
     except Exception as e:
         print("Error sending email:", e)
         raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/verify-auth-token")
-async def verify_auth_token(req: VerifySchema):
-    data = token_store.get(req.email)
-    if not data:
-        raise HTTPException(status_code=400, detail="No token found")
-
-    token, expires_at = data
-    if time.time() > expires_at:
-        token_store.pop(req.email, None)
-        raise HTTPException(status_code=400, detail="Token expired")
-
-    if req.token != token:
-        raise HTTPException(status_code=400, detail="Invalid token")
-
-    token_store.pop(req.email, None)
-    return {"status": "verified"}

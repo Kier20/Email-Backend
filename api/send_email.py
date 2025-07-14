@@ -35,13 +35,13 @@ async def send_auth_token(req: RequestSchema):
         token_store[req.email] = (token, time.time() + TOKEN_TTL)
 
         message = Mail(
-            from_email=os.getenv("SENDGRID_FROM"),
+            from_email=os.getenv("kierroca@gmail.com"),
             to_emails=req.email,
             subject="Your Verification Code",
             html_content=f"<p>Your code is <strong>{token}</strong>. It expires in 5 minutes.</p>",
         )
 
-        sg = SendGridAPIClient(os.getenv("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"))
+        sg = SendGridAPIClient(os.getenv("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"))
         sg.send(message)
 
         return {"status": "sent"}

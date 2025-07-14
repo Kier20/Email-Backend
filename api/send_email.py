@@ -1,62 +1,72 @@
-import json
-import os
-import time
-import random
-import string
-
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, EmailStr
+from fastapi.middleware.cors import CORSMiddleware
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
+import os, time, random, string
 
-TOKEN_TTL = 5 * 60  # 5 minutes
-token_store = {}
+app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["POST"],
+    allow_headers=["*"],
+)
 
-def generate_token(length=6):
-    return ''.join(random.choices(string.digits, k=length))
+# In-memory token store
+token_store: dict[str, tuple[str, float]] = {}
+TOKEN_TTL = 5 * 60
 
-def handler(request):
-    if request.method == "POST":
-        try:
-            body = request.json()
+class RequestSchema(BaseModel):
+    email: EmailStr
 
-            if request.path == "/api/send-auth-token":
-                email = body["email"]
-                token = generate_token()
-                expires_at = time.time() + TOKEN_TTL
-                token_store[email] = (token, expires_at)
+class VerifySchema(BaseModel):
+    email: EmailStr
+    token: str
 
-                message = Mail(
-                    from_email=os.getenv("SENDGRID_FROM", "no-reply@admissionsystem.com"),
-                    to_emails=email,
-                    subject="Your Authentication Code",
-                    html_content=f"<p>Your token is <strong>{token}</strong>. Expires in 5 minutes.</p>",
-                )
+@app.get("/api/send-auth-token")
+def send_auth_token_info():
+    return {"detail": "This endpoint only supports POST requests."}
 
-                sg = SendGridAPIClient(os.getenv("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"))
-                sg.send(message)
+@app.post("/api/send-auth-token")
+async def send_auth_token(req: RequestSchema):
+    token = "".join(random.choices(string.digits, k=6))
+    expires_at = time.time() + TOKEN_TTL
+    token_store[req.email] = (token, expires_at)
 
-                return {
-                    "statusCode": 200,
-                    "body": json.dumps({"status": "sent"})
-                }
+    message = Mail(
+        from_email=os.getenv("SENDGRID_FROM", "no-reply@admissionsystem.com"),
+        to_emails=req.email,
+        subject="Your Verification Code",
+        html_content=f"<p>Your code is <strong>{token}</strong>. It expires in 5 minutes.</p>",
+    )
 
-            elif request.path == "/api/verify-auth-token":
-                email = body["email"]
-                token = body["token"]
-                stored = token_store.get(email)
+    try:
+        api_key = os.getenv("SENDGRID_API_KEY")
+        if not api_key:
+            raise Exception("Missing SENDGRID_API_KEY")
 
-                if not stored:
-                    return {"statusCode": 400, "body": json.dumps({"error": "No token found"})}
+        sg = SendGridAPIClient(api_key)
+        sg.send(message)
 
-                stored_token, expires_at = stored
-                if time.time() > expires_at:
-                    return {"statusCode": 400, "body": json.dumps({"error": "Token expired"})}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"SendGrid error: {str(e)}")
 
-                if stored_token != token:
-                    return {"statusCode": 400, "body": json.dumps({"error": "Invalid token"})}
+    return {"status": "sent"}
 
-                return {"statusCode": 200, "body": json.dumps({"status": "verified"})}
+@app.post("/api/verify-auth-token")
+async def verify_auth_token(req: VerifySchema):
+    data = token_store.get(req.email)
+    if not data:
+        raise HTTPException(status_code=400, detail="No token found")
 
-        except Exception as e:
-            return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
+    token, expires_at = data
+    if time.time() > expires_at:
+        token_store.pop(req.email, None)
+        raise HTTPException(status_code=400, detail="Token expired")
 
-    return {"statusCode": 405, "body": json.dumps({"error": "Method not allowed"})}
+    if req.token != token:
+        raise HTTPException(status_code=400, detail="Invalid token")
+
+    token_store.pop(req.email, None)
+    return {"status": "verified"}

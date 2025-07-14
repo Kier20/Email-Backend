@@ -1,44 +1,65 @@
-import os
-import time
-import random
-import string
-
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, EmailStr
+from fastapi.middleware.cors import CORSMiddleware
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
+import os, time, random, string
 
 app = FastAPI()
 
-token_store = {}
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Restrict in prod
+    allow_methods=["POST"],
+    allow_headers=["*"],
+)
+
+# In-memory token storage
+token_store: dict[str, tuple[str, float]] = {}
 TOKEN_TTL = 5 * 60  # 5 minutes
 
 class RequestSchema(BaseModel):
     email: EmailStr
 
-def generate_token(length: int = 6):
-    return ''.join(random.choices(string.digits, k=length))
+class VerifySchema(BaseModel):
+    email: EmailStr
+    token: str
 
-@app.post("/")
-async def handler(req: Request):
-    body = await req.json()
-    data = RequestSchema(**body)
+def generate_token(length: int = 6) -> str:
+    return "".join(random.choices(string.digits, k=length))
 
-    token = generate_token()
-    expires_at = time.time() + TOKEN_TTL
-    token_store[data.email] = (token, expires_at)
-
-    message = Mail(
-        from_email=os.getenv("SENDGRID_FROM", "no-reply@admissionsystem.com"),
-        to_emails=data.email,
-        subject="Your Verification Code",
-        html_content=f"<p>Your code is <strong>{token}</strong>. It expires in 5 minutes.</p>",
-    )
-
+@app.post("/api/send-auth-token")
+async def send_auth_token(req: RequestSchema):
     try:
+        token = generate_token()
+        token_store[req.email] = (token, time.time() + TOKEN_TTL)
+
+        message = Mail(
+            from_email=os.getenv("SENDGRID_FROM"),
+            to_emails=req.email,
+            subject="Your Verification Code",
+            html_content=f"<p>Your code is <strong>{token}</strong>. It expires in 5 minutes.</p>",
+        )
+
         sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
         sg.send(message)
-    except Exception as e:
-        return {"error": str(e)}
 
-    return {"status": "sent"}
+        return {"status": "sent"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/verify-auth-token")
+async def verify_token(req: VerifySchema):
+    if req.email not in token_store:
+        raise HTTPException(status_code=400, detail="No token found")
+
+    token, expiry = token_store[req.email]
+    if time.time() > expiry:
+        del token_store[req.email]
+        raise HTTPException(status_code=400, detail="Token expired")
+
+    if req.token != token:
+        raise HTTPException(status_code=400, detail="Invalid token")
+
+    del token_store[req.email]
+    return {"status": "verified"}

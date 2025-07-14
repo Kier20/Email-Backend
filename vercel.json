@@ -1,11 +1,10 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "api/send_email.py",
-      "use": "@vercel/python"
+  "functions": {
+    "api/send_email.py": {
+      "runtime": "python3.10"
     }
-  ],
+  },
   "routes": [
     {
       "src": "/api/(.*)",

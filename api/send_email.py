@@ -41,7 +41,7 @@ async def send_auth_token(req: RequestSchema):
             html_content=f"<p>Your code is <strong>{token}</strong>. It expires in 5 minutes.</p>",
         )
 
-        sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
+        sg = SendGridAPIClient(os.getenv("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"))
         sg.send(message)
 
         return {"status": "sent"}

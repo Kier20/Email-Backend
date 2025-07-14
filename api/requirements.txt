@@ -1,4 +1,0 @@
-fastapi
-uvicorn
-sendgrid
-python-dotenv

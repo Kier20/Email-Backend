@@ -31,7 +31,7 @@ def handler(request):
                     html_content=f"<p>Your token is <strong>{token}</strong>. Expires in 5 minutes.</p>",
                 )
 
-                sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
+                sg = SendGridAPIClient(os.getenv("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"))
                 sg.send(message)
 
                 return {

@@ -9,6 +9,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
+# send_email.py
+from fastapi import Request
+import json
+
+def handler(request: Request):
+    return {
+        "statusCode": 200,
+        "body": json.dumps({"message": "Vercel doesn't support FastAPI directly"})
+    }
+
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,

@@ -1,20 +1,18 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, EmailStr
 from fastapi.middleware.cors import CORSMiddleware
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
-import os, time, random, string
+import os, time, random, string, requests
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Restrict in prod
+    allow_origins=["*"],  # Restrict in production
     allow_methods=["POST"],
     allow_headers=["*"],
 )
 
-# In-memory token storage
+# Token storage
 token_store: dict[str, tuple[str, float]] = {}
 TOKEN_TTL = 5 * 60  # 5 minutes
 
@@ -34,17 +32,28 @@ async def send_auth_token(req: RequestSchema):
         token = generate_token()
         token_store[req.email] = (token, time.time() + TOKEN_TTL)
 
-        message = Mail(
-            from_email=os.getenv("roca.ek.bscs@gmail.com"),
-            to_emails=req.email,
-            subject="Your Verification Code",
-            html_content=f"<p>Your code is <strong>{token}</strong>. It expires in 5 minutes.</p>",
-        )
+        # Prepare Elastic Email API request
+        api_key = os.getenv("B0E82A2EC01EE44F9D383FC659D063E47D2B")
+        sender_email = os.getenv("roca.ek.bscs@gmail.com")
 
-        sg = SendGridAPIClient(os.getenv("B0E82A2EC01EE44F9D383FC659D063E47D2B"))
-        sg.send(message)
+        if not api_key or not sender_email:
+            raise Exception("Missing ELASTICEMAIL_API_KEY or ELASTICEMAIL_SENDER env variable.")
+
+        payload = {
+            "apikey": api_key,
+            "from": sender_email,
+            "to": req.email,
+            "subject": "Your Verification Code",
+            "bodyHtml": f"<p>Your code is <strong>{token}</strong>. It expires in 5 minutes.</p>",
+            "isTransactional": True
+        }
+
+        response = requests.post("https://api.elasticemail.com/v2/email/send", data=payload)
+        if response.status_code != 200 or response.json().get("success") is not True:
+            raise Exception(response.json().get("error", "Failed to send email"))
 
         return {"status": "sent"}
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

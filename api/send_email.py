@@ -23,8 +23,8 @@ def send_auth_token():
         token_store[email] = (token, time.time() + TOKEN_TTL)
 
         # MailerSend API config
-        api_key = os.getenv("MAILERSEND_API_KEY")
-        from_email = os.getenv("MAILERSEND_FROM_EMAIL")
+        api_key = os.getenv("Api_Key")
+        from_email = os.getenv("Verified_Email")
 
         if not api_key or not from_email:
             raise ValueError("Missing MAILERSEND_API_KEY or MAILERSEND_FROM_EMAIL")

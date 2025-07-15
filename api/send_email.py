@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from mailersend import emails
-import os, time, random, string
+import os, time, random, string, traceback
 
 app = Flask(__name__)
 
@@ -44,8 +44,9 @@ def send_auth_token():
         return jsonify({"status": "sent"})
 
     except Exception as e:
-        print("Error occurred in send_auth_token:", str(e))
-        return jsonify({"error": str(e)}), 500
+    print("Error occurred in send_auth_token:", str(e))
+    traceback.print_exc()
+    return jsonify({"error": str(e)}), 500
 
 @app.route("/api/verify-auth-token", methods=["POST"])
 def verify_auth_token():

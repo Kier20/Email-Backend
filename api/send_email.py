@@ -41,6 +41,7 @@ def send_auth_token():
         return jsonify({"status": "sent"})
 
     except Exception as e:
+        print("Error occurred in send_auth_token:", str(e))  # Detailed log
         return jsonify({"error": str(e)}), 500
 
 # Verify token

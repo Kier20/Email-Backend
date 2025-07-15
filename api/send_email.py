@@ -37,7 +37,15 @@ def send_auth_token():
         html = f"<p>Your code is <strong>{token}</strong>. It expires in 5 minutes.</p>"
 
         # Send
-        mailer.send(from_email, [email], subject, html, text)
+        response = mailer.send(
+            from_email,
+            [email],
+            subject,
+            html,
+            text
+        )
+
+        print("MailerSend response:", response)
         return jsonify({"status": "sent"})
 
     except Exception as e:

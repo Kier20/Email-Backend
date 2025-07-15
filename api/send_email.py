@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, EmailStr
 from fastapi.middleware.cors import CORSMiddleware
 import os, time, random, string
-from mailersend import NewApiClient
+from mailersend import emails
 
 app = FastAPI()
 
@@ -38,7 +38,7 @@ async def send_auth_token(req: RequestSchema):
         token_store[req.email] = (token, time.time() + TOKEN_TTL)
 
         # Setup MailerSend client
-        mailer = NewApiClient(api_key=os.getenv("mlsn.43d80840d49ecab1423ffa853a83061b24ea28a0e2dc78d2c3302da2e26c9bf1"))
+        mailer = emails.NewEmail(os.getenv("mlsn.43d80840d49ecab1423ffa853a83061b24ea28a0e2dc78d2c3302da2e26c9bf1"))
 
         from_email = os.getenv("kierroce@gmail.com", "test-zkq340eyd8xgd796.mlsender.net")
         subject = "Your Verification Code"

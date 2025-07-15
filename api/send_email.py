@@ -1,89 +1,68 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, EmailStr
-from fastapi.middleware.cors import CORSMiddleware
-import os, time, random, string, traceback
+from flask import Flask, request, jsonify
 from mailersend import emails
+import os, time, random, string
 
-app = FastAPI()
+app = Flask(__name__)
 
-# Enable CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Token TTL and in-memory storage
+# Token storage
 token_store: dict[str, tuple[str, float]] = {}
 TOKEN_TTL = 5 * 60  # 5 minutes
 
-# Schemas
-class RequestSchema(BaseModel):
-    email: EmailStr
-
-class VerifySchema(BaseModel):
-    email: EmailStr
-    token: str
-
-# Token generator
+# Generate 6-digit token
 def generate_token(length: int = 6) -> str:
     return ''.join(random.choices(string.digits, k=length))
 
-# Send token
-@app.post("/api/send-auth-token")
-async def send_auth_token(req: RequestSchema):
+# Send auth token
+@app.route("/api/send-auth-token", methods=["POST"])
+def send_auth_token():
     try:
+        data = request.get_json()
+        email = data.get("email")
+        if not email:
+            return jsonify({"error": "Email required"}), 400
+
         token = generate_token()
-        token_store[req.email] = (token, time.time() + TOKEN_TTL)
+        token_store[email] = (token, time.time() + TOKEN_TTL)
 
-        # Print token for debugging
-        print(f"Generated token for {req.email}: {token}")
-
-        # Setup MailerSend client (read from ENV)
+        # Load MailerSend credentials
         api_key = os.getenv("mlsn.43d80840d49ecab1423ffa853a83061b24ea28a0e2dc78d2c3302da2e26c9bf1")
         from_email = os.getenv("kierroca@gmail.com")
-
         if not api_key or not from_email:
-            raise ValueError("Missing MAILERSEND_API_KEY or MAILERSEND_FROM_EMAIL environment variable")
+            raise ValueError("Missing MAILERSEND_API_KEY or MAILERSEND_FROM_EMAIL")
 
+        # MailerSend client
         mailer = emails.NewEmail(api_key)
-
         subject = "Your Verification Code"
-        text = f"Your verification code is {token}. It expires in 5 minutes."
-        html = f"<p>Your verification code is <strong>{token}</strong>. It expires in 5 minutes.</p>"
+        text = f"Your code is {token}. It expires in 5 minutes."
+        html = f"<p>Your code is <strong>{token}</strong>. It expires in 5 minutes.</p>"
 
-        response = mailer.send(
-            from_email,
-            [req.email],
-            subject,
-            html,
-            text
-        )
-
-        print(f"MailerSend API response: {response}")
-
-        return {"status": "sent"}
+        # Send
+        mailer.send(from_email, [email], subject, html, text)
+        return jsonify({"status": "sent"})
 
     except Exception as e:
-        print("Error occurred in send_auth_token:")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        return jsonify({"error": str(e)}), 500
 
 # Verify token
-@app.post("/api/verify-auth-token")
-async def verify_token(req: VerifySchema):
-    data = token_store.get(req.email)
-    if not data:
-        raise HTTPException(status_code=400, detail="No token found")
+@app.route("/api/verify-auth-token", methods=["POST"])
+def verify_auth_token():
+    data = request.get_json()
+    email = data.get("email")
+    user_token = data.get("token")
 
-    token, expiry = data
+    if email not in token_store:
+        return jsonify({"error": "No token found"}), 400
+
+    token, expiry = token_store[email]
     if time.time() > expiry:
-        token_store.pop(req.email, None)
-        raise HTTPException(status_code=400, detail="Token expired")
+        token_store.pop(email)
+        return jsonify({"error": "Token expired"}), 400
 
-    if req.token != token:
-        raise HTTPException(status_code=400, detail="Invalid token")
+    if token != user_token:
+        return jsonify({"error": "Invalid token"}), 400
 
-    token_store.pop(req.email, None)
-    return {"status": "verified"}
+    token_store.pop(email)
+    return jsonify({"status": "verified"})
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)

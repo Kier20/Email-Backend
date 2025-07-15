@@ -4,7 +4,7 @@ import os, time, random, string, traceback
 
 app = Flask(__name__)
 
-token_store: dict[str, tuple[str, float]] = {}
+token_store = {}
 TOKEN_TTL = 5 * 60  # 5 minutes
 
 def generate_token(length=6):
@@ -23,29 +23,27 @@ def send_auth_token():
 
         api_key = os.getenv("Api_Key")
         from_email = os.getenv("Verified_Email")
-
         if not api_key or not from_email:
             raise ValueError("Missing MAILERSEND_API_KEY or MAILERSEND_FROM_EMAIL")
 
-        mailer = emails.NewEmail(api_key)
         subject = "Your Verification Code"
-        text = f"Your code is {token}. It expires in 5 minutes."
         html = f"<p>Your code is <strong>{token}</strong>. It expires in 5 minutes.</p>"
+        text = f"Your code is {token}. It expires in 5 minutes."
 
-        response = mailer.send(
-        sender=from_email,
-        recipients=[email],
-        subject=subject,
-        html=html,
-        text=text
-    )
+        mailer = emails.NewEmail(api_key)
+        mailer.set_from(from_email)
+        mailer.set_to(email)
+        mailer.set_subject(subject)
+        mailer.set_html(html)
+        mailer.set_text(text)
 
+        response = mailer.send()
 
         print("MailerSend response:", response)
         return jsonify({"status": "sent"})
 
     except Exception as e:
-        print("Error occurred in send_auth_token:", str(e))
+        print("Error in send_auth_token:", str(e))
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
@@ -69,6 +67,6 @@ def verify_auth_token():
     token_store.pop(email)
     return jsonify({"status": "verified"})
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)

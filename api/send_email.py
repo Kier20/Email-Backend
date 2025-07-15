@@ -65,5 +65,6 @@ def verify_auth_token():
     token_store.pop(email)
     return jsonify({"status": "verified"})
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+
+if __name__ == '__main__':
+    app.run(debug=True)

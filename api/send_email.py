@@ -1,18 +1,17 @@
 from flask import Flask, request, jsonify
 from mailersend import emails
 import os, time, random, string
+from dotenv import load_dotenv
+
+load_dotenv()  # Load from .env if local
 
 app = Flask(__name__)
-
-# Token storage
 token_store: dict[str, tuple[str, float]] = {}
-TOKEN_TTL = 5 * 60  # 5 minutes
+TOKEN_TTL = 5 * 60
 
-# Generate 6-digit token
 def generate_token(length: int = 6) -> str:
     return ''.join(random.choices(string.digits, k=length))
 
-# Send auth token
 @app.route("/api/send-auth-token", methods=["POST"])
 def send_auth_token():
     try:
@@ -24,35 +23,25 @@ def send_auth_token():
         token = generate_token()
         token_store[email] = (token, time.time() + TOKEN_TTL)
 
-        # Load MailerSend credentials
-        api_key = os.getenv("mlsn.43d80840d49ecab1423ffa853a83061b24ea28a0e2dc78d2c3302da2e26c9bf1")
-        from_email = os.getenv("noreply@test-zkq340eyd8xgd796.mlsender.net")
+        # Correctly load env vars
+        api_key = os.getenv("Api_Key")
+        from_email = os.getenv("Verified_Email")
         if not api_key or not from_email:
             raise ValueError("Missing MAILERSEND_API_KEY or MAILERSEND_FROM_EMAIL")
 
-        # MailerSend client
         mailer = emails.NewEmail(api_key)
         subject = "Your Verification Code"
         text = f"Your code is {token}. It expires in 5 minutes."
         html = f"<p>Your code is <strong>{token}</strong>. It expires in 5 minutes.</p>"
 
-        # Send
-        response = mailer.send(
-            from_email,
-            [email],
-            subject,
-            html,
-            text
-        )
+        response = mailer.send(from_email, [email], subject, html, text)
 
         print("MailerSend response:", response)
         return jsonify({"status": "sent"})
-
     except Exception as e:
-        print("Error occurred in send_auth_token:", str(e))  # Detailed log
+        print("Error occurred in send_auth_token:", str(e))
         return jsonify({"error": str(e)}), 500
 
-# Verify token
 @app.route("/api/verify-auth-token", methods=["POST"])
 def verify_auth_token():
     data = request.get_json()
@@ -72,7 +61,6 @@ def verify_auth_token():
 
     token_store.pop(email)
     return jsonify({"status": "verified"})
-
 
 if __name__ == '__main__':
     app.run(debug=True)

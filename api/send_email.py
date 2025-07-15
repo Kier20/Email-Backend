@@ -1,15 +1,13 @@
 from flask import Flask, request, jsonify
 from mailersend import emails
 import os, time, random, string
-from dotenv import load_dotenv
-
-load_dotenv()  # Load from .env if local
 
 app = Flask(__name__)
-token_store: dict[str, tuple[str, float]] = {}
-TOKEN_TTL = 5 * 60
 
-def generate_token(length: int = 6) -> str:
+token_store: dict[str, tuple[str, float]] = {}
+TOKEN_TTL = 5 * 60  # 5 minutes
+
+def generate_token(length=6):
     return ''.join(random.choices(string.digits, k=length))
 
 @app.route("/api/send-auth-token", methods=["POST"])
@@ -23,9 +21,9 @@ def send_auth_token():
         token = generate_token()
         token_store[email] = (token, time.time() + TOKEN_TTL)
 
-        # Correctly load env vars
-        api_key = os.getenv("Api_Key")
-        from_email = os.getenv("Verified_Email")
+        api_key = os.getenv("MAILERSEND_API_KEY")
+        from_email = os.getenv("MAILERSEND_FROM_EMAIL")
+
         if not api_key or not from_email:
             raise ValueError("Missing MAILERSEND_API_KEY or MAILERSEND_FROM_EMAIL")
 
@@ -34,10 +32,17 @@ def send_auth_token():
         text = f"Your code is {token}. It expires in 5 minutes."
         html = f"<p>Your code is <strong>{token}</strong>. It expires in 5 minutes.</p>"
 
-        response = mailer.send(from_email, [email], subject, html, text)
+        response = mailer.send(
+            from_email,
+            [email],
+            subject,
+            html,
+            text
+        )
 
         print("MailerSend response:", response)
         return jsonify({"status": "sent"})
+
     except Exception as e:
         print("Error occurred in send_auth_token:", str(e))
         return jsonify({"error": str(e)}), 500
@@ -63,4 +68,5 @@ def verify_auth_token():
     return jsonify({"status": "verified"})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)

@@ -26,7 +26,7 @@ def send_auth_token():
 
         # Load MailerSend credentials
         api_key = os.getenv("mlsn.43d80840d49ecab1423ffa853a83061b24ea28a0e2dc78d2c3302da2e26c9bf1")
-        from_email = os.getenv("kierroca@gmail.com")
+        from_email = os.getenv("noreply@test-zkq340eyd8xgd796.mlsender.net")
         if not api_key or not from_email:
             raise ValueError("Missing MAILERSEND_API_KEY or MAILERSEND_FROM_EMAIL")
 

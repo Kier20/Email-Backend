@@ -1,5 +1,3 @@
-fastapi
-uvicorn
-python-dotenv
-email-validator
-mailersend
+Flask==3.0.3
+mailersend==1.2.4
+email-validator==2.1.0.post1

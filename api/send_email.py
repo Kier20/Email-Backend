@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, EmailStr
 from fastapi.middleware.cors import CORSMiddleware
-import os, time, random, string
+import os, time, random, string, traceback
 from mailersend import emails
 
 app = FastAPI()
@@ -14,7 +14,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Token TTL and storage
+# Token TTL and in-memory storage
 token_store: dict[str, tuple[str, float]] = {}
 TOKEN_TTL = 5 * 60  # 5 minutes
 
@@ -37,15 +37,23 @@ async def send_auth_token(req: RequestSchema):
         token = generate_token()
         token_store[req.email] = (token, time.time() + TOKEN_TTL)
 
-        # Setup MailerSend client
-        mailer = emails.NewEmail(os.getenv("mlsn.43d80840d49ecab1423ffa853a83061b24ea28a0e2dc78d2c3302da2e26c9bf1"))
+        # Print token for debugging
+        print(f"Generated token for {req.email}: {token}")
 
-        from_email = os.getenv("kierroce@gmail.com", "test-zkq340eyd8xgd796.mlsender.net")
+        # Setup MailerSend client (read from ENV)
+        api_key = os.getenv("MAILERSEND_API_KEY")
+        from_email = os.getenv("MAILERSEND_FROM_EMAIL", "no-reply@example.com")
+
+        if not api_key or not from_email:
+            raise ValueError("Missing MAILERSEND_API_KEY or MAILERSEND_FROM_EMAIL environment variable")
+
+        mailer = emails.NewEmail(api_key)
+
         subject = "Your Verification Code"
         text = f"Your verification code is {token}. It expires in 5 minutes."
         html = f"<p>Your verification code is <strong>{token}</strong>. It expires in 5 minutes.</p>"
 
-        mailer.send(
+        response = mailer.send(
             from_email,
             [req.email],
             subject,
@@ -53,10 +61,14 @@ async def send_auth_token(req: RequestSchema):
             text
         )
 
+        print(f"MailerSend API response: {response}")
+
         return {"status": "sent"}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print("Error occurred in send_auth_token:")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 # Verify token
 @app.post("/api/verify-auth-token")

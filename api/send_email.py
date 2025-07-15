@@ -33,12 +33,13 @@ def send_auth_token():
         html = f"<p>Your code is <strong>{token}</strong>. It expires in 5 minutes.</p>"
 
         response = mailer.send(
-            from_email,
-            [email],
-            subject,
-            html,
-            text
-        )
+        sender=from_email,
+        recipients=[email],
+        subject=subject,
+        html=html,
+        text=text
+    )
+
 
         print("MailerSend response:", response)
         return jsonify({"status": "sent"})
